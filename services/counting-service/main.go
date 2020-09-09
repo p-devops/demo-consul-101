@@ -8,17 +8,24 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/gorilla/mux"
+	//"github.com/gorilla/mux"
+	muxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/gorilla/mux"
+    "gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 func main() {
+	tracer.Start(
+		tracer.WithService("counting-service"),
+		tracer.WithEnv("dev"),
+    )
+	
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "80"
 	}
 	portWithColon := fmt.Sprintf(":%s", port)
 
-	router := mux.NewRouter()
+	router := muxtrace.NewRouter()	
 	router.HandleFunc("/health", HealthHandler)
 
 	var index uint64
@@ -27,6 +34,8 @@ func main() {
 	// Serve!
 	fmt.Printf("Serving at http://localhost:%s\n(Pass as PORT environment variable)\n", port)
 	log.Fatal(http.ListenAndServe(portWithColon, router))
+	defer tracer.Stop()
+
 }
 
 // HealthHandler returns a succesful status and a message.

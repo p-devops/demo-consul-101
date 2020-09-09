@@ -13,15 +13,21 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
-	"github.com/gorilla/mux"
+	//"github.com/gorilla/mux"
 	gosocketio "github.com/graarh/golang-socketio"
 	"github.com/graarh/golang-socketio/transport"
+	muxtrace "gopkg.in/DataDog/dd-trace-go.v1/contrib/gorilla/mux"
+    "gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 var countingServiceURL string
 var port string
 
 func main() {
+	tracer.Start(
+		tracer.WithService("dashboard-service"),
+		tracer.WithEnv("dev"),
+    )
 	port = getEnvOrDefault("PORT", "80")
 	portWithColon := fmt.Sprintf(":%s", port)
 
@@ -34,7 +40,8 @@ func main() {
 
 	failTrack := new(failureTracker)
 
-	router := mux.NewRouter()
+	//router := mux.NewRouter()
+	router := muxtrace.NewRouter()
 	router.PathPrefix("/socket.io/").Handler(startWebsocket(failTrack))
 	router.HandleFunc("/health", HealthHandler)
 	router.HandleFunc("/health/api", HealthAPIHandler(failTrack))
@@ -42,6 +49,7 @@ func main() {
 	router.PathPrefix("/").Handler(http.FileServer(rice.MustFindBox("assets").HTTPBox()))
 
 	log.Fatal(http.ListenAndServe(portWithColon, router))
+	defer tracer.Stop()
 }
 
 func getEnvOrDefault(key, fallback string) string {
